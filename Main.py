@@ -179,15 +179,13 @@ def main():
     linedImage = houghLines(ROIImage, rho, theta, threshold, min_line_len, max_line_gap)
 
     # Combine it with original image
-    result = weightedImage(linedImage, roadImage, a=0.8, ß=1., λ=0.5)
+    result = weightedImage(linedImage, cv2.cvtColor(roadImage, cv2.COLOR_GRAY2RGB), a=0.8, ß=1., λ=0.5)
 
-    # Show image and wait
-    cv2.imshow('result', getResizeImage(result, 800, 600))
+    showImage(roadImage, 'Road')
+    showImage(result, 'Result')
 
     cv2.waitKey(0)
     cv2.destroyAllWindows()
-
-    showImage(roadImage, 'Road')
 
 
 if __name__ == '__main__':
