@@ -80,6 +80,10 @@ def adjustSaturation(image):
 def getGrayScale(image):
     return cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
+
+def getRGB(image):
+    return cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
+
 def countFrames(video):
     total = 0
 
@@ -179,7 +183,7 @@ def main():
     linedImage = houghLines(ROIImage, rho, theta, threshold, min_line_len, max_line_gap)
 
     # Combine it with original image
-    result = weightedImage(linedImage, cv2.cvtColor(roadImage, cv2.COLOR_GRAY2RGB), a=0.8, ß=1., λ=0.5)
+    result = weightedImage(linedImage, getRGB(roadImage), a=0.8, ß=1., λ=0.5)
 
     showImage(roadImage, 'Road')
     showImage(result, 'Result')
