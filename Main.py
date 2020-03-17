@@ -1,4 +1,5 @@
 import cv2
+import subprocess
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -10,14 +11,14 @@ def getFPS(videoPath):
     return fps
 
 # Count the number of frames in a video
-def countFrames(videoPath):
+def getTotalFramesOfVideo(videoPath):
     totalFrames = cv2.VideoCapture(videoPath).get(cv2.CAP_PROP_FRAME_COUNT)
     return totalFrames
 
 # Get the total duration of a video in seconds
 def getDurationOfVideo(videoPath):
     # duration = totalFrames in video / frames per seconds of video
-    duration = countFrames(videoPath) / getFPS(videoPath)
+    duration = getTotalFramesOfVideo(videoPath) / getFPS(videoPath)
     return duration
 
 # write frames
@@ -57,9 +58,9 @@ def drawLines(img, lines, color=None, thickness=2):
 def houghLines(img, rho, theta, threshold, min_line_len, max_line_gap):
     lines = cv2.HoughLinesP(img, rho, theta, threshold, np.array([]), minLineLength=min_line_len,
                             maxLineGap=max_line_gap)
-    line_img = np.zeros((img.shape[0], img.shape[1], 3), dtype=np.uint8)
-    drawLines(line_img, lines)
-    return line_img
+    lineImage = np.zeros((img.shape[0], img.shape[1], 3), dtype=np.uint8)
+    drawLines(lineImage, lines)
+    return lineImage
 
 def weightedImage(img, initialImage, a=0.8, ß=1., λ=0.):
     return cv2.addWeighted(initialImage, a, img, ß, λ)
@@ -140,7 +141,9 @@ def removeVehicles(videoPath):
     framesList = []
 
     # Loop through the video for number of frames
+    skipper = 0
     while True:
+        skipper += 1
         # Get the frame
         ret, frame = video.read()
 
@@ -149,12 +152,18 @@ def removeVehicles(videoPath):
         if frame is None:
             break
 
+        if skipper % 2 is not 0:
+            continue
+
         # If frame is not null
         # convert resize the frame and convert it to greyscale
         gray = getGrayScale(getResizeImage(frame, 800, 600))
 
         # And add it in the frames List
         framesList.append(gray)
+
+    # Release video
+    video.release()
 
     # Get the number of rows and cols of the first frame
     # Only getting of first frame because all are same
@@ -191,17 +200,28 @@ def removeVehicles(videoPath):
     return newImage
 
 def adjustVideoLength(videoPath):
-    print('test')
-
+    videoOutputPath = 'temp.mp4'
+    FPS = getFPS(videoPath)
+    totalFrames = getTotalFramesOfVideo(videoPath)
+    origDuration = totalFrames / FPS
+    multiplier = str(10 / origDuration)
+    c = 'ffmpeg -an -i ' + videoPath + ' -filter:v "setpts=' + multiplier + '*PTS" ' + videoOutputPath
+    subprocess.call(c, shell=True)
+    print('video converted')
 
 def main():
 
-    # Set the video path
-    videoPath = 'fast3.mp4'
+    # Set the video paths
+    originalVideoPath = 'video7.mp4'
+    videoPath = 'temp.mp4'
 
-    dev = False
+    # Adjust video length to make it 10 seconds video
+    adjustVideoLength(originalVideoPath)
+
+    dev = True
     if dev:
-        print(countFrames(cv2.VideoCapture(videoPath)))
+        print(str(getTotalFramesOfVideo(videoPath)) + ' total frames')
+        print(str(getDurationOfVideo(videoPath)) + ' seconds')
 
     # removeVehicle function tries to remove any moving
     # objects from the video and returns an image
