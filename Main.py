@@ -4,19 +4,21 @@ import matplotlib.pyplot as plt
 
 # Dev functions start
 
-# count the number of frames in a video
-def countFrames(video):
-    total = 0
+# Get FPS of video
+def getFPS(videoPath):
+    fps = cv2.VideoCapture(videoPath).get(cv2.CAP_PROP_FPS)
+    return fps
 
-    while True:
-        (grabbed, frame) = video.read()
+# Count the number of frames in a video
+def countFrames(videoPath):
+    totalFrames = cv2.VideoCapture(videoPath).get(cv2.CAP_PROP_FRAME_COUNT)
+    return totalFrames
 
-        if not grabbed:
-            break
-
-        total += 1
-
-    return total
+# Get the total duration of a video in seconds
+def getDurationOfVideo(videoPath):
+    # duration = totalFrames in video / frames per seconds of video
+    duration = countFrames(videoPath) / getFPS(videoPath)
+    return duration
 
 # write frames
 def makeFramesForDev(videoPath):
@@ -182,7 +184,7 @@ def removeVehicles(videoPath):
             # Assign the mean value to the resultImage at the same location
             newImage[row][col] = mean
 
-    #         Then continue for every pixel in the frameList
+    # Then continue for every pixel in the frameList
 
     fix, ax = plt.subplots(figsize=(10, 10))
     ax.axis('off')
