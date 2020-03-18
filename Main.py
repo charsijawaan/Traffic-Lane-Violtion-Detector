@@ -7,135 +7,71 @@ import matplotlib.pyplot as plt
 originalVideoPath = 'video7.mp4'
 tempVideoPath = 'temp.mp4'
 
-# Dev functions start
+def main():
 
-# Get FPS of video
-def getFPS(videoPath):
-    fps = cv2.VideoCapture(videoPath).get(cv2.CAP_PROP_FPS)
-    return fps
+    # Set the video paths
+    global originalVideoPath
+    global tempVideoPath
 
-# Count the number of frames in a video
-def getTotalFramesOfVideo(videoPath):
-    totalFrames = cv2.VideoCapture(videoPath).get(cv2.CAP_PROP_FRAME_COUNT)
-    return totalFrames
+    # Adjust video length to make it 10 seconds video
+    adjustVideoLength(originalVideoPath, 10)
 
-# Get the total duration of a video in seconds
-def getDurationOfVideo(videoPath):
-    # duration = totalFrames in video / frames per seconds of video
-    duration = getTotalFramesOfVideo(videoPath) / getFPS(videoPath)
-    return duration
+    dev = True
+    if dev:
+        print(str(getTotalFramesOfVideo(tempVideoPath)) + ' total frames')
+        print(str(getDurationOfVideo(tempVideoPath)) + ' seconds')
 
-# write frames
-def makeFramesForDev(videoPath):
-    video = cv2.VideoCapture(videoPath)
-    i = 0
-    while video.isOpened():
-        ret, frame = video.read()
-        if not ret:
-            break
-        cv2.imwrite('frame' + str(i) + '.jpg', frame)
-        i += 1
+    # removeVehicle function tries to remove any moving
+    # objects from the video and returns an image
+    roadImage = removeVehicles(tempVideoPath)
 
-    video.release()
+    # Find white color in the filtered image
+    maskWhite = cv2.inRange(roadImage, 210, 255)
+
+    # Binary conversion of image
+    (thresh, blackAndWhiteImage) = cv2.threshold(maskWhite, 127, 255, cv2.THRESH_BINARY)
+    x, y = blackAndWhiteImage.shape
+
+    # Get road lined from image
+    linedImage = detectRoadLines(getRGB(blackAndWhiteImage))
+
+    # Combine the images with detected lines and original image
+    result = weightedImage(linedImage, getRGB(roadImage), a=0.3, ß=1., λ=0.5)
+
+    # Show Images
+    showImage(roadImage, 'Road')
+    showImage(linedImage, 'Lined')
+    showImage(result, 'Result')
+
+    cv2.waitKey(0)
     cv2.destroyAllWindows()
 
-# Dev functions end here
+# Make any video of desired length by making it
+# slower or faster
+def adjustVideoLength(videoPath, newDuration):
+    global tempVideoPath
+
+    # Get FPS of the original video
+    FPS = getFPS(videoPath)
+
+    # Get total number of frames in original video
+    totalFrames = getTotalFramesOfVideo(videoPath)
+
+    # Divide both to get the duration of video in seconds
+    originalDuration = totalFrames / FPS
+
+    # Now calculate the multiplier to make the video of 10 seconds
+    multiplier = str(newDuration / originalDuration)
+
+    # Using ffmpeg to make the video faster or slower
+    c = 'ffmpeg -an -i ' + videoPath + ' -filter:v "setpts=' \
+        + multiplier + '*PTS" ' + tempVideoPath
+    subprocess.call(c, shell=True)
+
+    print('video converted')
 
 
-class Vertices:
-    def __init__(self, imageShape, lowerLeft, lowerRight, topLeft, topRight):
-        self.imageShape = imageShape
-        self.lowerLeft = lowerLeft
-        self.lowerRight = lowerRight
-        self.topLeft = topLeft
-        self.topRight = topRight
-
-
-def drawLines(img, lines, color=None, thickness=2):
-    if color is None:
-        color = [0, 0, 255]
-    for line in lines:
-        for x1, y1, x2, y2 in line:
-            cv2.line(img, (x1, y1), (x2, y2), color, thickness)
-
-
-def houghLines(img, rho, theta, threshold, min_line_len, max_line_gap):
-    lines = cv2.HoughLinesP(img, rho, theta, threshold, np.array([]), minLineLength=min_line_len,
-                            maxLineGap=max_line_gap)
-    lineImage = np.zeros((img.shape[0], img.shape[1], 3), dtype=np.uint8)
-    drawLines(lineImage, lines)
-    return lineImage
-
-def weightedImage(img, initialImage, a=0.8, ß=1., λ=0.):
-    return cv2.addWeighted(initialImage, a, img, ß, λ)
-
-def regionOfInterest(image, vertices):
-    mask = np.zeros_like(image)
-
-    if len(image.shape) > 2:
-        channelCount = image.shape[2]
-        ignoreMaskColor = (255,) * channelCount
-    else:
-        ignoreMaskColor = 255
-
-    cv2.fillPoly(mask, vertices, ignoreMaskColor)
-
-    maskedImage = cv2.bitwise_and(image, mask)
-    return maskedImage
-
-
-def getResizeImage(image, width, height):
-    return cv2.resize(image, (width, height), interpolation=cv2.INTER_AREA)
-
-def getCannyEdges(gauss_gray):
-    lowThreshold = 60
-    highThreshold = 60*3
-    return cv2.Canny(gauss_gray, lowThreshold, highThreshold)
-
-def getVertices(image):
-    imageShape = image.shape
-    lowerLeft = [0, imageShape[0]]
-    lowerRight = [imageShape[1], imageShape[0]]
-    topLeft = [0, 0]
-    topRight = [imageShape[1], 0]
-
-    v = Vertices(imageShape, lowerLeft, lowerRight, topLeft, topRight)
-    return [np.array([v.lowerLeft, v.topLeft, v.topRight, v.lowerRight], dtype=np.int32)]
-
-def adjustGamma(image, gamma=0.6):
-    invGamma = 1.0 / gamma
-    table = np.array([((i / 255.0) ** invGamma) * 255 for i in np.arange(0, 256)]).astype("uint8")
-    return cv2.LUT(image, table)
-
-def adjustSaturation(image):
-    # contrast
-    alpha = 1.2
-    # brightness
-    beta = 0.2
-    new_image = np.zeros(image.shape, image.dtype)
-    new_image = cv2.convertScaleAbs(image, alpha=alpha, beta=beta)
-    return new_image
-
-# Converts RGB to Greyscale image
-def getGrayScale(image):
-    return cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-
-
-# Converts Greyscale image to RGB image
-def getRGB(image):
-    return cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
-
-# Apply Gaussian blur on given image
-def getGaussianBlur(maskWhite):
-    # You can set the mask size here
-    # Odd mask size is better
-    maskSize = 3
-    return cv2.GaussianBlur(maskWhite, (maskSize, maskSize), 0)
-
-# Function to show image with title on screen
-def showImage(image, title):
-    cv2.imshow(title, getResizeImage(image, 800, 600))
-
+# Remove moving vehicles from a video
 def removeVehicles(videoPath):
 
     # Get the video
@@ -203,74 +139,121 @@ def removeVehicles(videoPath):
     ax.axis('off')
     return newImage
 
-def adjustVideoLength(videoPath, newDuration):
-    global tempVideoPath
 
-    # Get FPS of the original video
-    FPS = getFPS(videoPath)
-
-    # Get total number of frames in original video
-    totalFrames = getTotalFramesOfVideo(videoPath)
-
-    # Divide both to get the duration of video in seconds
-    originalDuration = totalFrames / FPS
-
-    # Now calculate the multiplier to make the video of 10 seconds
-    multiplier = str(newDuration / originalDuration)
-
-    # Using ffmpeg to make the video faster or slower
-    c = 'ffmpeg -an -i ' + videoPath + ' -filter:v "setpts=' \
-        + multiplier + '*PTS" ' + tempVideoPath
-    subprocess.call(c, shell=True)
-
-    print('video converted')
-
-def main():
-
-    # Set the video paths
-    global originalVideoPath
-    global tempVideoPath
-
-    # Adjust video length to make it 10 seconds video
-    adjustVideoLength(originalVideoPath, 10)
-
-    dev = True
-    if dev:
-        print(str(getTotalFramesOfVideo(tempVideoPath)) + ' total frames')
-        print(str(getDurationOfVideo(tempVideoPath)) + ' seconds')
-
-    # removeVehicle function tries to remove any moving
-    # objects from the video and returns an image
-    roadImage = removeVehicles(tempVideoPath)
-
-    # Find white color in the filtered image
-    maskWhite = cv2.inRange(roadImage, 210, 255)
-
-    (thresh, blackAndWhiteImage) = cv2.threshold(maskWhite, 127, 255, cv2.THRESH_BINARY)
-
+def detectRoadLines(blackAndWhiteImage):
     x, y = blackAndWhiteImage.shape
-    linedImage = np.copy(getRGB(blackAndWhiteImage))
 
+    # Make copy of the image (result image)
+    linedImage = np.copy(blackAndWhiteImage)
+
+    # Iterate over the image
     for row in range(x - 1):
         for col in range(y - 1):
+            # If value above 127 make it red
             if blackAndWhiteImage[row][col] > 127:
                 linedImage[row][col][0] = 0
                 linedImage[row][col][1] = 0
                 linedImage[row][col][2] = 255
+            # Else make it black
             else:
                 linedImage[row][col][0] = 0
                 linedImage[row][col][1] = 0
                 linedImage[row][col][2] = 0
+    return linedImage
 
-    result = weightedImage(linedImage, getRGB(roadImage), a=0.3, ß=1., λ=0.5)
 
-    # Show Images
-    showImage(roadImage, 'Road')
-    showImage(linedImage, 'Lined')
-    showImage(result, 'Result')
+# Get FPS of video
+def getFPS(videoPath):
+    fps = cv2.VideoCapture(videoPath).get(cv2.CAP_PROP_FPS)
+    return fps
 
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+
+# Count the number of frames in a video
+def getTotalFramesOfVideo(videoPath):
+    totalFrames = cv2.VideoCapture(videoPath).get(cv2.CAP_PROP_FRAME_COUNT)
+    return totalFrames
+
+
+# Get the total duration of a video in seconds
+def getDurationOfVideo(videoPath):
+    # duration = totalFrames in video / frames per seconds of video
+    duration = getTotalFramesOfVideo(videoPath) / getFPS(videoPath)
+    return duration
+
+
+def drawLines(img, lines, color=None, thickness=2):
+    if color is None:
+        color = [0, 0, 255]
+    for line in lines:
+        for x1, y1, x2, y2 in line:
+            cv2.line(img, (x1, y1), (x2, y2), color, thickness)
+
+
+# Combine two images
+def weightedImage(img, initialImage, a=0.8, ß=1., λ=0.):
+    return cv2.addWeighted(initialImage, a, img, ß, λ)
+
+
+# Resize an image
+def getResizeImage(image, width, height):
+    return cv2.resize(image, (width, height), interpolation=cv2.INTER_AREA)
+
+
+# Find Edges in an image
+def getCannyEdges(image):
+    lowThreshold = 60
+    highThreshold = 60*3
+    return cv2.Canny(image, lowThreshold, highThreshold)
+
+
+# Adjust gamma of an image
+def adjustGamma(image, gamma=0.6):
+    invGamma = 1.0 / gamma
+    table = np.array([((i / 255.0) ** invGamma) * 255 for i in np.arange(0, 256)]).astype("uint8")
+    return cv2.LUT(image, table)
+
+
+# adjust saturation of an image
+def adjustSaturation(image):
+    # contrast
+    alpha = 1.2
+    # brightness
+    beta = 0.2
+    new_image = np.zeros(image.shape, image.dtype)
+    new_image = cv2.convertScaleAbs(image, alpha=alpha, beta=beta)
+    return new_image
+
+
+# Converts RGB to Greyscale image
+def getGrayScale(image):
+    return cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+
+# Converts Greyscale image to RGB image
+def getRGB(image):
+    return cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
+
+
+# Apply Gaussian blur on given image
+def getGaussianBlur(maskWhite):
+    # You can set the mask size here
+    # Odd mask size is better
+    maskSize = 3
+    return cv2.GaussianBlur(maskWhite, (maskSize, maskSize), 0)
+
+
+# Function to show image with title on screen
+def showImage(image, title):
+    cv2.imshow(title, getResizeImage(image, 800, 600))
+
+
+class Vertices:
+    def __init__(self, imageShape, lowerLeft, lowerRight, topLeft, topRight):
+        self.imageShape = imageShape
+        self.lowerLeft = lowerLeft
+        self.lowerRight = lowerRight
+        self.topLeft = topLeft
+        self.topRight = topRight
 
 
 if __name__ == '__main__':
