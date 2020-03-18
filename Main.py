@@ -228,30 +228,29 @@ def main():
     roadImage = removeVehicles(videoPath)
 
     # Find white color in the filtered image
-    maskWhite = cv2.inRange(roadImage, 200, 255)
+    maskWhite = cv2.inRange(roadImage, 210, 255)
 
-    # Get canny edges of image
-    cannyEdges = getCannyEdges(maskWhite)
+    (thresh, blackAndWhiteImage) = cv2.threshold(maskWhite, 127, 255, cv2.THRESH_BINARY)
 
-    # ROI is the whole image
-    vertices = getVertices(roadImage)
-    ROIImage = regionOfInterest(cannyEdges, vertices)
+    x, y = blackAndWhiteImage.shape
+    linedImage = np.copy(getRGB(blackAndWhiteImage))
 
-    # Don't know what this shit is
-    rho = 2
-    theta = np.pi / 180
-    threshold = 20
-    min_line_len = 50
-    max_line_gap = 200
+    for row in range(x - 1):
+        for col in range(y - 1):
+            if blackAndWhiteImage[row][col] > 127:
+                linedImage[row][col][0] = 0
+                linedImage[row][col][1] = 0
+                linedImage[row][col][2] = 255
+            else:
+                linedImage[row][col][0] = 0
+                linedImage[row][col][1] = 0
+                linedImage[row][col][2] = 0
 
-    # Make colored lines
-    linedImage = houghLines(ROIImage, rho, theta, threshold, min_line_len, max_line_gap)
-
-    # Combine it with original image
-    result = weightedImage(linedImage, getRGB(roadImage), a=0.8, ß=1., λ=0.5)
+    result = weightedImage(linedImage, getRGB(roadImage), a=0.3, ß=1., λ=0.5)
 
     # Show Images
     showImage(roadImage, 'Road')
+    showImage(linedImage, 'Lined')
     showImage(result, 'Result')
 
     cv2.waitKey(0)
