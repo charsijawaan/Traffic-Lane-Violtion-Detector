@@ -26,24 +26,48 @@ def main():
     roadImage = removeVehicles(tempVideoPath)
 
     # Find white color in the filtered image
-    maskWhite = cv2.inRange(roadImage, 210, 255)
+    maskWhite = cv2.inRange(roadImage, 200, 255)
 
     # Binary conversion of image
     (thresh, blackAndWhiteImage) = cv2.threshold(maskWhite, 127, 255, cv2.THRESH_BINARY)
     x, y = blackAndWhiteImage.shape
 
     # Get road lined from image
-    linedImage = detectRoadLines(getRGB(blackAndWhiteImage))
+    linedImage = detectRoadLines(blackAndWhiteImage)
 
     # Combine the images with detected lines and original image
     result = weightedImage(linedImage, getRGB(roadImage), a=0.3, ß=1., λ=0.5)
 
-    # Show Images
-    showImage(roadImage, 'Road')
-    showImage(linedImage, 'Lined')
-    showImage(result, 'Result')
+    # Combine the original video and lined image obtained
+    combineRoadAndVideo(linedImage)
 
-    cv2.waitKey(0)
+    # Show Images
+    # showImage(roadImage, 'Road')
+    # showImage(linedImage, 'Lined')
+    # showImage(result, 'Result')
+
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
+
+
+def combineRoadAndVideo(image):
+    global originalVideoPath
+    # Read the original video
+    video = cv2.VideoCapture(originalVideoPath)
+
+    while video.isOpened():
+        ret, frame = video.read()
+        # Resize frame
+        resizedFrame = getResizeImage(frame, 800, 600)
+        if ret:
+            # Combine both images
+            combinedImage = weightedImage(image, resizedFrame, a=0.6, ß=1., λ=0.8)
+            cv2.imshow('Frame', getResizeImage(combinedImage, 800, 600))
+            cv2.waitKey(0)
+        else:
+            break
+    video.release()
+
     cv2.destroyAllWindows()
 
 # Make any video of desired length by making it
@@ -144,7 +168,7 @@ def detectRoadLines(blackAndWhiteImage):
     x, y = blackAndWhiteImage.shape
 
     # Make copy of the image (result image)
-    linedImage = np.copy(blackAndWhiteImage)
+    linedImage = np.copy(getRGB(blackAndWhiteImage))
 
     # Iterate over the image
     for row in range(x - 1):
@@ -152,8 +176,8 @@ def detectRoadLines(blackAndWhiteImage):
             # If value above 127 make it red
             if blackAndWhiteImage[row][col] > 127:
                 linedImage[row][col][0] = 0
-                linedImage[row][col][1] = 0
-                linedImage[row][col][2] = 255
+                linedImage[row][col][1] = 255
+                linedImage[row][col][2] = 0
             # Else make it black
             else:
                 linedImage[row][col][0] = 0
