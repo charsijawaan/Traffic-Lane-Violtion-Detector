@@ -3,6 +3,10 @@ import subprocess
 import numpy as np
 import matplotlib.pyplot as plt
 
+# Globals
+originalVideoPath = 'video7.mp4'
+tempVideoPath = 'temp.mp4'
+
 # Dev functions start
 
 # Get FPS of video
@@ -199,33 +203,45 @@ def removeVehicles(videoPath):
     ax.axis('off')
     return newImage
 
-def adjustVideoLength(videoPath):
-    videoOutputPath = 'temp.mp4'
+def adjustVideoLength(videoPath, newDuration):
+    global tempVideoPath
+
+    # Get FPS of the original video
     FPS = getFPS(videoPath)
+
+    # Get total number of frames in original video
     totalFrames = getTotalFramesOfVideo(videoPath)
-    origDuration = totalFrames / FPS
-    multiplier = str(10 / origDuration)
-    c = 'ffmpeg -an -i ' + videoPath + ' -filter:v "setpts=' + multiplier + '*PTS" ' + videoOutputPath
+
+    # Divide both to get the duration of video in seconds
+    originalDuration = totalFrames / FPS
+
+    # Now calculate the multiplier to make the video of 10 seconds
+    multiplier = str(newDuration / originalDuration)
+
+    # Using ffmpeg to make the video faster or slower
+    c = 'ffmpeg -an -i ' + videoPath + ' -filter:v "setpts=' \
+        + multiplier + '*PTS" ' + tempVideoPath
     subprocess.call(c, shell=True)
+
     print('video converted')
 
 def main():
 
     # Set the video paths
-    originalVideoPath = 'video7.mp4'
-    videoPath = 'temp.mp4'
+    global originalVideoPath
+    global tempVideoPath
 
     # Adjust video length to make it 10 seconds video
-    adjustVideoLength(originalVideoPath)
+    adjustVideoLength(originalVideoPath, 10)
 
     dev = True
     if dev:
-        print(str(getTotalFramesOfVideo(videoPath)) + ' total frames')
-        print(str(getDurationOfVideo(videoPath)) + ' seconds')
+        print(str(getTotalFramesOfVideo(tempVideoPath)) + ' total frames')
+        print(str(getDurationOfVideo(tempVideoPath)) + ' seconds')
 
     # removeVehicle function tries to remove any moving
     # objects from the video and returns an image
-    roadImage = removeVehicles(videoPath)
+    roadImage = removeVehicles(tempVideoPath)
 
     # Find white color in the filtered image
     maskWhite = cv2.inRange(roadImage, 210, 255)
